@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Usuario</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/registros.css' %}">
+    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <br>
+        <!-- Logo en forma circular -->
+        <div class="logo-container">
+            {% if user.foto %}
+                <div class="user-photo">
+                    <img src="{{ user.foto.url }}" alt="Foto de {{ user.nombre }}" class="img-fluid">
+                </div>
+            {% else %}
+                <div class="user-initial">
+                    {{ user.nombre|slice:":1" }}{{ user.apellidos|slice:":1" }}
+                </div>
+            {% endif %}
+            <p class="role">{{ user.nombre }}</p>
+        </div>
+        <br>
+        <div class="menu-container">
+            <a href="{% url 'admin_dashboard' %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="{% url 'ventas' %}"><i class="fas fa-boxes"></i> Ventas</a>
+            <a href="{% url 'usuarios' %}"><i class="fas fa-users"></i> Usuarios</a>
+            <a href="{% url 'productos' %}"><i class="fas fa-cube"></i> Productos</a>
+            <a href="{% url 'clientes' %}"><i class="fas fa-user-tie"></i> Clientes</a>
+            <a href="{% url 'proveedores' %}"><i class="fas fa-truck"></i> Proveedores</a>
+            <a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a>
+        </div> 
+    </div>
+
+    <!-- Main content -->
+    <div class="content-form">
+        <h1>Registrar Usuario</h1>
+        <a href="{% url 'usuarios' %}" class="back-icon"><i class="fas fa-arrow-left"></i> Volver a Usuarios</a>
+    
+        <!-- Mensajes de error y éxito -->
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert {% if message.tags %}{{ message.tags }}{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    
+        <!-- Registration Form -->
+        <form method="post" class="formulario_actualizar" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <!-- Form Fields -->
+            <label for="dni" class="nombres">DNI:</label>
+            <input type="text" class="entradas" name="dni" maxlength="8" pattern="\d{8}" title="Ingrese solo números" required>
+            
+            <label for="nombre" class="nombres">Nombre:</label>
+            <input type="text" class="entradas" name="nombre" pattern="[A-Za-z\s]+" title="Solo se permiten letras y espacios" required>
+            
+            <label for="apellidos" class="nombres">Apellidos:</label>
+            <input type="text" class="entradas" name="apellidos" pattern="[A-Za-z\s]+" title="Solo se permiten letras y espacios" required>
+            
+            <label for="correo" class="nombres">Correo:</label>
+            <input type="email" class="entradas" name="correo" required>
+            
+            <label for="telefono" class="nombres">Teléfono:</label>
+            <input type="text" class="entradas" name="telefono" maxlength="9" pattern="\d{9}" title="Ingrese solo números" required>
+            
+            <label for="edad" class="nombres">Edad:</label>
+            <input type="number" class="entradas" name="edad" min="18" max="120" pattern="\d*" title="Ingrese solo números" required>
+            
+            <label for="password" class="nombres">Contraseña:</label>
+            <input type="password" class="entradas" name="password" required>
+            
+            <!-- Grupo Selection (Rol) -->
+            <label for="grupo" class="nombres">Rol:</label>
+            <select name="grupo" class="entradas" required>
+                <option value="">Seleccionar grupo</option>
+                {% for grupo in grupos %}
+                    <option value="{{ grupo.name }}">{{ grupo.name }}</option>
+                {% endfor %}
+            </select>
+            
+            <label for="foto" class="nombres">Foto:</label>
+            <input type="file" class="entradas" name="foto" accept="image/png, image/jpeg, image/jpg, image/gif">
+        
+            <!-- Submit Button -->
+            <button type="submit" class="register-button"><i class="fas fa-file-alt"></i> Registrar</button>
+        </form>
+        
+    </div>
+    
+
+</body>
+</html>
