@@ -1379,7 +1379,7 @@ def reporte_productos_pdf(request):
             y -= 20
 
             # Si la página se llena, añadir una nueva página
-            if y < 50:
+            if y < 90:
                 pdf.showPage()
                 pdf.setFont("Helvetica", 12)
                 pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
@@ -1474,7 +1474,7 @@ def reporte_clientes_pdf(request):
             y -= 20
 
             # Añadir nueva página si es necesario
-            if y < 50:
+            if y < 90:
                 pdf.showPage()
                 pdf.setFont("Helvetica-Bold", 14)
                 pdf.drawString(200, alto - 100, "Reporte de Clientes")
