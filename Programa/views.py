@@ -1,22 +1,46 @@
 
+from django.conf import settings
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
-from django.http import Http404, HttpResponse, HttpResponseNotFound
+from django.http import Http404, HttpResponse
 from django.views.decorators.cache import never_cache
 from .models import Almacen, Categoria, Cliente, Inventario, Producto, Proveedor, Usuario, Venta
 from .forms import LoginForm, VentaForm
-from django.http import Http404
 from django.http import JsonResponse
 from .models import Producto
 from django.db.models import Count
 from django.db.models import Sum
 from django.contrib.auth.models import Group
 from django.contrib.auth.hashers import make_password
-from django.views.decorators.csrf import csrf_exempt
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from .models import Venta
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import os
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+import json
+from django.contrib import messages
+from django.core.mail import EmailMessage
+from django.core.mail import BadHeaderError
+from reportlab.pdfgen import canvas
+from django.http import HttpResponse
+from .models import Proveedor, Cliente, Usuario
+import io
+from datetime import datetime
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from django.http import HttpResponse
+import os
+from datetime import datetime
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 import json
 
@@ -1193,3 +1217,490 @@ def v_eliminar_venta(request, venta_id):
 
 
 ###############################################################################
+
+##reportes
+# Generar y guardar el PDF de ventas
+def reporte_ventas_pdf(request):
+    # Crear la respuesta HTTP con tipo de contenido PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_ventas.pdf"'
+
+    # Configurar el documento PDF
+    doc = SimpleDocTemplate(response, pagesize=letter)
+    elementos = []
+
+    # Estilos
+    styles = getSampleStyleSheet()
+    
+    # Estilo personalizado para el título principal
+    titulo_style = ParagraphStyle(
+        'TituloStyle',
+        parent=styles['Title'],
+        fontSize=16,
+        alignment=1,  # Centrado
+        spaceAfter=12
+    )
+
+    # Fecha actual
+    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    # Logo de la empresa
+    logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
+    
+    # Fecha
+    elementos.append(Paragraph(f"Fecha de Reporte: {fecha_actual}", styles['Normal']))
+    elementos.append(Spacer(1, 12))  # Espacio en blanco
+    elementos.append(Spacer(1, 12))  # Espacio en blanco
+
+    # Agregar elementos al documento
+    # Título principal
+    elementos.append(Paragraph("Reporte de Ventas", titulo_style))
+
+    # Datos de la tabla
+    ventas = Venta.objects.all()
+    datos_tabla = [
+        ['Cliente', 'Producto', 'Cantidad', 'Fecha de Venta', 'Total']
+    ]
+
+    for venta in ventas:
+        datos_tabla.append([
+            venta.cliente.nombre,
+            venta.producto.nombre,
+            str(venta.cantidad),
+            str(venta.fecha_venta),
+            f"S/. {venta.total():.2f}"
+        ])
+
+    # Crear tabla con estilo
+    tabla = Table(datos_tabla)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.grey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 12),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+        ('BACKGROUND', (0,1), (-1,-1), colors.beige),
+        ('GRID', (0,0), (-1,-1), 1, colors.black)
+    ]))
+
+    elementos.append(tabla)
+
+    # Pie de página con número de página
+    def pie_pagina(canvas, doc):
+        canvas.saveState()
+        
+        # Agregar logo en la esquina superior derecha
+        try:
+            logo = Image(logo_path, width=2*inch, height=0.7*inch)
+            logo.drawOn(canvas, letter[0]-2.5*inch, letter[1]-1*inch)
+        except Exception as e:
+            print(f"Error al cargar el logo: {e}")
+        
+        # Número de página en la parte inferior
+        canvas.setFont('Helvetica', 10)
+        canvas.drawString(inch, 0.75 * inch, f"Página {doc.page}")
+        canvas.restoreState()
+
+    # Construir el PDF
+    doc.build(elementos, onFirstPage=pie_pagina, onLaterPages=pie_pagina)
+
+    return response
+
+# Generar y guardar el PDF de productos
+def reporte_productos_pdf(request):
+    # Crear el objeto HttpResponse con el tipo de contenido PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_almacenes.pdf"'
+
+    # Crear el objeto Canvas de ReportLab
+    pdf = canvas.Canvas(response, pagesize=letter)
+    ancho, alto = letter
+
+    # Fecha actual
+    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
+
+    # Logo de la empresa
+    logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
+    try:
+        pdf.drawImage(logo_path, ancho - 2.5 * inch, alto - 1.3 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
+    except Exception as e:
+        print(f"Error al cargar el logo: {e}")
+
+    # Título del reporte
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(200, alto - 120, "Reporte de Almacenes")  # Ajustamos la coordenada Y
+
+
+    y = alto - 170  # Posición inicial
+
+    # Obtener los datos de los almacenes
+    almacenes = Almacen.objects.all()
+
+    for almacen in almacenes:
+        # Mostrar el nombre del almacén
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(50, y, f"Almacén: {almacen.nombre}")
+        y -= 20
+
+        # Obtener todos los productos relacionados
+        productos = Producto.objects.all()
+
+        if not productos.exists():
+            pdf.setFont("Helvetica-Oblique", 12)
+            pdf.drawString(70, y, "No hay productos registrados.")
+            y -= 20
+            continue
+
+        # Encabezados de la tabla
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(70, y, "Producto")
+        pdf.drawString(200, y, "Cantidad Total")
+        pdf.drawString(300, y, "Precio Total")
+        pdf.drawString(400, y, "Proveedor")
+        y -= 20
+
+        # Datos de los productos agrupados
+        pdf.setFont("Helvetica", 12)
+        for producto in productos:
+            # Obtener inventarios relacionados con el almacén y producto
+            inventarios = Inventario.objects.filter(almacen=almacen, producto=producto)
+
+            # Calcular cantidad total y precio total
+            cantidad_total = inventarios.aggregate(Sum('cantidad'))['cantidad__sum'] or 0
+            precio_total = cantidad_total * (producto.precio or 0.0)
+            proveedor = producto.proveedor.nombre if producto.proveedor else "Ninguno"
+
+            # Mostrar los datos del producto
+            pdf.drawString(70, y, str(producto.nombre))
+            pdf.drawString(200, y, str(cantidad_total))
+            pdf.drawString(300, y, f"S/. {precio_total:.2f}")
+            pdf.drawString(400, y, proveedor)
+            y -= 20
+
+            # Si la página se llena, añadir una nueva página
+            if y < 50:
+                pdf.showPage()
+                pdf.setFont("Helvetica", 12)
+                pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
+                try:
+                    pdf.drawImage(logo_path, ancho - 2.5 * inch, alto - 1.3 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
+                except Exception as e:
+                    print(f"Error al cargar el logo en la nueva página: {e}")
+                y -= 20  # Espacio de 20 puntos hacia abajo
+
+                pdf.setFont("Helvetica-Bold", 16)
+                pdf.drawString(200, alto - 90, "Reporte de Almacenes")
+                y = alto - 120
+
+        # Espacio entre almacenes
+        y -= 20
+
+    # Finalizar el documento PDF
+    pdf.showPage()
+    pdf.save()
+    return response
+
+# Generar y guardar el PDF de cliente
+def reporte_clientes_pdf(request):
+    # Crear el objeto HttpResponse con el tipo de contenido PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_clientes.pdf"'
+
+    # Crear el objeto Canvas de ReportLab
+    pdf = canvas.Canvas(response, pagesize=letter)
+    ancho, alto = letter
+
+    # Fecha actual
+    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
+
+    # Logo de la empresa
+    logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
+    try:
+        pdf.drawImage(logo_path, ancho - 2.5 * inch, alto - 1.5 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
+    except Exception as e:
+        print(f"Error al cargar el logo: {e}")
+
+    # Título del reporte
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(200, alto - 130, "Reporte de Clientes")
+
+    y = alto - 180  # Posición inicial
+
+    # Obtener todos los clientes
+    clientes = Cliente.objects.all()
+
+    for cliente in clientes:
+        # Información del cliente
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(50, y, f"Cliente: {cliente.nombre} {cliente.apellido or ''}")
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(50, y - 20, f"DNI: {cliente.dni}")
+        pdf.drawString(200, y - 20, f"Teléfono: {cliente.telefono or 'N/A'}")
+        pdf.drawString(400, y - 20, f"Correo: {cliente.correo or 'N/A'}")
+        y -= 40
+
+        # Mostrar encabezado de la tabla de compras
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(70, y, "Producto")
+        pdf.drawString(200, y, "Cantidad")
+        pdf.drawString(300, y, "Precio Total")
+        pdf.drawString(400, y, "Fecha de Compra")
+        y -= 20
+
+        # Obtener los productos comprados por el cliente a través de las ventas
+        ventas = Venta.objects.filter(cliente=cliente)
+
+        if not ventas.exists():
+            pdf.setFont("Helvetica-Oblique", 12)
+            pdf.drawString(70, y, "No hay compras registradas para este cliente.")
+            y -= 20
+            continue
+
+        # Detalles de las compras
+        for venta in ventas:
+            producto = venta.producto
+            cantidad = venta.cantidad
+            precio_total = cantidad * producto.precio
+            fecha_compra = venta.fecha_venta.strftime("%d/%m/%Y")  # Formato de fecha
+
+            # Mostrar datos de la compra
+            pdf.drawString(70, y, producto.nombre)
+            pdf.drawString(200, y, str(cantidad))
+            pdf.drawString(300, y, f"S/. {precio_total:.2f}")
+            pdf.drawString(400, y, fecha_compra)
+            y -= 20
+
+            # Añadir nueva página si es necesario
+            if y < 50:
+                pdf.showPage()
+                pdf.setFont("Helvetica-Bold", 14)
+                pdf.drawString(200, alto - 100, "Reporte de Clientes")
+                pdf.setFont("Helvetica", 12)
+                pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
+                try:
+                    pdf.drawImage(logo_path, ancho - 2.5 * inch, alto - 1.5 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
+                except Exception as e:
+                    print(f"Error al cargar el logo en la nueva página: {e}")
+                y = alto - 150
+
+        # Espacio entre clientes
+        y -= 20
+
+    # Finalizar el PDF
+    pdf.showPage()
+    pdf.save()
+    return response
+
+# Función para generar reporte de proveedores
+def reporte_proveedores(request):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_proveedores.pdf"'  # Mostrar en navegador
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    ancho, height = letter
+
+    # Fecha actual
+    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, height - 50, f"Fecha de Reporte: {fecha_actual}")
+
+    # Logo de la empresa
+    logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
+    try:
+        pdf.drawImage(logo_path, ancho - 2.5 * inch, height - 1.5 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
+    except Exception as e:
+        print(f"Error al cargar el logo: {e}")
+        
+    # Encabezado del reporte
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(50, height - 130, "Reporte de Proveedores")
+    pdf.setFont("Helvetica", 12)
+
+    y = height - 180  # Espaciado inicial
+
+    # Iterar sobre los proveedores
+    for proveedor in Proveedor.objects.all():
+        if y < 100:  # Crear nueva página si no hay espacio
+            pdf.showPage()
+            y = height - 50
+            pdf.setFont("Helvetica", 12)
+
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(50, y, proveedor.nombre)
+        y -= 20
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(50, y, f"RUC: {proveedor.ruc}                NOMBRE: {proveedor.nombre}")
+        y -= 15
+        pdf.drawString(50, y, f"Contacto: {proveedor.telefono or '-'}    Email: {proveedor.correo or '-'}   Dirección: {proveedor.direccion or '-'}")
+        y -= 30
+
+    pdf.save()
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    response.write(pdf_data)
+    return response
+
+# Función para generar reporte de clientes
+def reporte_clientes(request):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_clientes.pdf"'  # Mostrar en navegador
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    ancho, height = letter
+
+    # Fecha actual
+    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, height - 50, f"Fecha de Reporte: {fecha_actual}")
+
+    # Logo de la empresa
+    logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
+    try:
+        pdf.drawImage(logo_path, ancho - 2.5 * inch, height - 1.5 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
+    except Exception as e:
+        print(f"Error al cargar el logo: {e}")
+
+    # Encabezado del reporte
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(50, height - 120, "Reporte de Clientes")
+    pdf.setFont("Helvetica", 12)
+
+    y = height - 170  # Espaciado inicial
+
+    # Iterar sobre los clientes
+    for cliente in Cliente.objects.all():
+        if y < 100:  # Crear nueva página si no hay espacio
+            pdf.showPage()
+            y = height - 50
+            pdf.setFont("Helvetica", 12)
+
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(50, y, f"{cliente.nombre} {cliente.apellido or ''}")
+        y -= 20
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(50, y, f"DNI: {cliente.dni}")
+        y -= 15
+        pdf.drawString(50, y, f"Teléfono: {cliente.telefono or '-'}                 Email: {cliente.correo or '-'}")
+        y -= 30
+
+    pdf.save()
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    response.write(pdf_data)
+    return response
+
+# Función para generar reporte de usuarios
+def reporte_usuarios(request):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_usuarios.pdf"'  # Mostrar en navegador
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    ancho, height = letter
+
+    # Fecha actual
+    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, height - 50, f"Fecha de Reporte: {fecha_actual}")
+
+    # Logo de la empresa
+    logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
+    try:
+        pdf.drawImage(logo_path, ancho - 2.5 * inch, height - 1.5 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
+    except Exception as e:
+        print(f"Error al cargar el logo: {e}")
+
+    # Encabezado del reporte
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(50, height - 130, "Reporte de Usuarios")
+    pdf.setFont("Helvetica", 12)
+
+    y = height - 170  # Espaciado inicial
+
+    # Usuarios administradores
+    for usuario in Usuario.objects.filter(is_admin=True):
+        if y < 100:  # Crear nueva página si no hay espacio
+            pdf.showPage()
+            y = height - 50
+            pdf.setFont("Helvetica", 12)
+
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(50, y, f"Administrador: {usuario.nombre} {usuario.apellidos}")
+        y -= 20
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(50, y, f"DNI: {usuario.dni}")
+        y -= 15
+        pdf.drawString(50, y, f"Teléfono: {usuario.telefono}                Email: {usuario.correo}                 Edad: {usuario.edad} años")
+        y -= 30
+
+    # Usuarios vendedores
+    for usuario in Usuario.objects.filter(is_admin=False):
+        if y < 100:  # Crear nueva página si no hay espacio
+            pdf.showPage()
+            y = height - 50
+            pdf.setFont("Helvetica", 12)
+
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawString(50, y, f"Vendedor: {usuario.nombre} {usuario.apellidos}")
+        y -= 20
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(50, y, f"DNI: {usuario.dni}")
+        y -= 15
+        pdf.drawString(50, y, f"Teléfono: {usuario.telefono}                Email: {usuario.correo}                 Edad: {usuario.edad} años")
+        y -= 30
+
+    pdf.save()
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    response.write(pdf_data)
+    return response
+
+# Enviar el PDF por correo
+class EnviarReportePDF(APIView):
+    def post(self, request):
+        try:
+            archivo_pdf = request.FILES.get('archivo_pdf')
+            if not archivo_pdf:
+                return Response({'message': 'No se envió un archivo PDF. Por favor, adjunta un archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if archivo_pdf.content_type != 'application/pdf':
+                return Response({'message': f'El archivo enviado no es válido ({archivo_pdf.content_type}). Solo se permiten archivos PDF.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if archivo_pdf.size == 0:
+                return Response({'message': 'El archivo está vacío.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            self.enviar_correo(archivo_pdf)
+
+            ventas = Venta.objects.all().order_by('-fecha_venta')[:10]
+            return Response({'message': 'Reporte enviado satisfactoriamente.', 'ventas': list(ventas.values())}, status=status.HTTP_200_OK)
+        
+        except ValidationError as ve:
+            return Response({'message': f'Error de validación: {str(ve)}'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'message': f'Error inesperado al enviar el reporte: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def enviar_correo(self, archivo_pdf):
+        try:
+            to_email = "jackblas29jack@gmail.com"
+            subject = "Reporte de Silicon"
+            message = "Se adjunta el reporte solicitado."
+
+            email = EmailMessage(
+                subject=subject,
+                body=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[to_email],
+            )
+            email.attach(archivo_pdf.name, archivo_pdf.read(), archivo_pdf.content_type)
+            email.send()
+        except BadHeaderError:
+            raise ValidationError("Encabezado inválido en el correo.")
+        except Exception as e:
+            raise ValidationError(f"Error al enviar el correo: {str(e)}")

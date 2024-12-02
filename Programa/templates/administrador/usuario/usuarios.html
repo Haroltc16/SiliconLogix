@@ -95,12 +95,93 @@
                 </tbody>
             </table>
         </div>
-        <!-- Botón para registrar nuevo usuario -->
-        <div class="register-container">
+         <!-- Botón para registrar nuevo usuario -->
+         <div class="register-container">
             <a href="{% url 'registrar_usuario' %}">
                 <button type="submit" class="register-button"><i class="fas fa-user-plus"></i> Registrar Nuevo</button>
             </a>
         </div>
+        <div class="register-container">
+            <a href="{% url 'reporte_usuarios' %}">
+                <button type="button" class="register-button">
+                    <i class="fas fa-user-plus"></i> Generar reporte
+                </button>
+            </a>
+        
+            <form id="form-reporte" action="{% url 'envio_reporte_pdf' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <label for="archivo_pdf">Seleccionar archivo PDF:</label>
+                <input type="file" id="archivo_pdf" name="archivo_pdf" accept="application/pdf" required>
+                <button id="submit-button" type="submit" class="register-button">
+                    <i class="fas fa-file-upload"></i> Enviar Reporte
+                </button>
+            </form>
+        
+            <p id="mensaje" style="display: none; color: green;">Reporte enviado satisfactoriamente</p>
+            <p id="error-mensaje" style="display: none; color: red;">Ocurrió un error al enviar el reporte</p>
+        </div>
+        
+        <script>
+            document.getElementById("form-reporte").addEventListener("submit", function (event) {
+                event.preventDefault(); // Evitar el envío estándar del formulario
+        
+                const form = event.target;
+                const formData = new FormData(form);
+                const submitButton = document.getElementById("submit-button");
+                const mensaje = document.getElementById("mensaje");
+                const errorMensaje = document.getElementById("error-mensaje");
+                const archivoInput = document.getElementById("archivo_pdf");
+        
+                // Validar que se haya seleccionado un archivo
+                if (!archivoInput.files.length) {
+                    errorMensaje.textContent = "Por favor, selecciona un archivo PDF.";
+                    errorMensaje.style.display = "block";
+                    setTimeout(() => {
+                        errorMensaje.style.display = "none";
+                    }, 3000);
+                    return;
+                }
+        
+                // Cambiar el botón a estado de cargando
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        
+                fetch(form.action, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                    },
+                })
+                    .then((response) => {
+                        if (!response.ok) {
+                            return response.json().then((data) => {
+                                throw new Error(data.message || "Error en el servidor");
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then((data) => {
+                        if (data.message && data.message.includes("satisfactoriamente")) {
+                            mensaje.textContent = data.message; // Mostrar mensaje de éxito
+                            mensaje.style.display = "block";
+                            errorMensaje.style.display = "none";
+                        } else {
+                            throw new Error(data.message || "Ocurrió un error al procesar el reporte");
+                        }
+                    })
+                    .catch((error) => {
+                        errorMensaje.textContent = error.message; // Mostrar mensaje de error
+                        errorMensaje.style.display = "block";
+                        mensaje.style.display = "none";
+                    })
+                    .finally(() => {
+                        // Restaurar el estado original del botón
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = '<i class="fas fa-file-upload"></i> Enviar Reporte';
+                    });
+            });
+        </script>
     </div>     
 </body>
 </html>

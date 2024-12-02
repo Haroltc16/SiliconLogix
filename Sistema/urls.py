@@ -3,6 +3,7 @@ from django.urls import path
 from Programa import views
 from django.conf.urls.static import static
 from Sistema import settings
+from Programa.views import EnviarReportePDF
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -99,7 +100,17 @@ urlpatterns = [
     path('v_proveedores/eliminar/<str:ruc>/', views.v_eliminar_proveedor, name='v_eliminar_proveedor'),
     path('v_proveedores/actualizar/<str:ruc>/', views.v_actualizar_proveedor, name='v_actualizar_proveedor'),
     path('v_proveedores/nuevo/', views.v_registrar_proveedor, name='v_registrar_proveedor'),
+    
+    #REPORTE
+    path('reporte_ventas/', views.reporte_ventas_pdf, name='reporte_ventas_pdf'),
+    path('reporte_productos/', views.reporte_productos_pdf, name='reporte_productos_pdf'),
+    path('reporte_clientes/compras/', views.reporte_clientes_pdf, name='reporte_clientes_pdf'),
+    path('reporte_usuarios/', views.reporte_usuarios, name='reporte_usuarios'),
+    path('reporte_proveedores/', views.reporte_proveedores, name='reporte_proveedores'),
+    path('reporte_clientes/', views.reporte_clientes, name='reporte_clientes'),
 
+    #envio de correo
+    path('envio-reporte-pdf/', EnviarReportePDF.as_view(), name='envio_reporte_pdf'),
 ]
 
 if settings.DEBUG:

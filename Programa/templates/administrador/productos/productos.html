@@ -103,6 +103,74 @@
                 <button type="submit" class="register-button"><i class="fas fa-user-plus"></i> Añadir Almacen</button>
             </a>
         </div>
+        <div class="register-container">
+            <a href="{% url 'reporte_productos_pdf' %}">
+                <button type="submit" class="register-button"><i class="fas fa-user-plus"></i>generar reporte</button>
+            </a>
+            
+            <form id="form-reporte" action="{% url 'envio_reporte_pdf' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <label for="archivo_pdf">Seleccionar archivo PDF:</label>
+                <input type="file" id="archivo_pdf" name="archivo_pdf" accept="application/pdf" required>
+                <button id="submit-button" type="submit" class="register-button">
+                    <i class="fas fa-file-upload"></i> Enviar Reporte
+                </button>
+            </form>
+            <p id="mensaje" style="display: none; color: green;">Reporte enviado satisfactoriamente</p>
+            <p id="error-mensaje" style="display: none; color: red;">Ocurrió un error al enviar el reporte</p>
+        </div>
+        <script>
+            document.getElementById("form-reporte").addEventListener("submit", function (event) {
+                event.preventDefault(); // Evitar el envío estándar del formulario
+        
+                const form = event.target;
+                const formData = new FormData(form);
+                const submitButton = document.getElementById("submit-button");
+                const mensaje = document.getElementById("mensaje");
+                const errorMensaje = document.getElementById("error-mensaje");
+        
+                // Cambiar el botón a estado de cargando
+                submitButton.disabled = true; // Deshabilitar el botón mientras se envía
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        
+                fetch(form.action, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                    },
+                })
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error("Error en el envío del reporte");
+                        }
+                        return response.json();
+                    })
+                    .then((data) => {
+                        if (data.message.includes("satisfactoriamente")) {
+                            mensaje.style.display = "block"; // Mostrar mensaje de éxito
+                            errorMensaje.style.display = "none"; // Ocultar mensaje de error
+                            setTimeout(() => {
+                                mensaje.style.display = "none"; // Ocultar después de 2 segundos
+                            }, 3000);
+                        } else {
+                            throw new Error(data.message); // Mostrar mensaje de error del servidor
+                        }
+                    })
+                    .catch((error) => {
+                        errorMensaje.textContent = error.message; // Mostrar error
+                        errorMensaje.style.display = "block";
+                        setTimeout(() => {
+                            errorMensaje.style.display = "none"; // Ocultar después de 2 segundos
+                        }, 2000);
+                    })
+                    .finally(() => {
+                        // Restaurar el estado original del botón
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = '<i class="fas fa-file-upload"></i> Enviar Reporte';
+                    });
+            });
+        </script>
     </div>
 </body>
 </html>
