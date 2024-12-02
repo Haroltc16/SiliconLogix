@@ -1355,11 +1355,10 @@ def reporte_productos_pdf(request):
             continue
 
         # Encabezados de la tabla
-        pdf.setFont("Helvetica", 12)
+        pdf.setFont("Helvetica-Bold", 12)
         pdf.drawString(70, y, "Producto")
-        pdf.drawString(200, y, "Cantidad Total")
-        pdf.drawString(300, y, "Precio Total")
-        pdf.drawString(400, y, "Proveedor")
+        pdf.drawString(300, y, "Cantidad Total")
+        pdf.drawString(410, y, "Proveedor")
         y -= 20
 
         # Datos de los productos agrupados
@@ -1375,9 +1374,8 @@ def reporte_productos_pdf(request):
 
             # Mostrar los datos del producto
             pdf.drawString(70, y, str(producto.nombre))
-            pdf.drawString(200, y, str(cantidad_total))
-            pdf.drawString(300, y, f"S/. {precio_total:.2f}")
-            pdf.drawString(400, y, proveedor)
+            pdf.drawString(330, y, str(cantidad_total))
+            pdf.drawString(420, y, proveedor)
             y -= 20
 
             # Si la página se llena, añadir una nueva página
@@ -1392,7 +1390,7 @@ def reporte_productos_pdf(request):
                 y -= 20  # Espacio de 20 puntos hacia abajo
 
                 pdf.setFont("Helvetica-Bold", 16)
-                pdf.drawString(200, alto - 90, "Reporte de Almacenes")
+                pdf.drawString(200, alto - 120, "Reporte de Almacenes")
                 y = alto - 120
 
         # Espacio entre almacenes
@@ -1427,9 +1425,9 @@ def reporte_clientes_pdf(request):
 
     # Título del reporte
     pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(200, alto - 130, "Reporte de Clientes")
+    pdf.drawString(200, alto - 120, "Reporte de Clientes")
 
-    y = alto - 180  # Posición inicial
+    y = alto - 150  # Posición inicial
 
     # Obtener todos los clientes
     clientes = Cliente.objects.all()
@@ -1447,9 +1445,9 @@ def reporte_clientes_pdf(request):
         # Mostrar encabezado de la tabla de compras
         pdf.setFont("Helvetica-Bold", 12)
         pdf.drawString(70, y, "Producto")
-        pdf.drawString(200, y, "Cantidad")
-        pdf.drawString(300, y, "Precio Total")
-        pdf.drawString(400, y, "Fecha de Compra")
+        pdf.drawString(320, y, "Cantidad")
+        pdf.drawString(390, y, "Precio Total")
+        pdf.drawString(480, y, "Fecha de Compra")
         y -= 20
 
         # Obtener los productos comprados por el cliente a través de las ventas
@@ -1470,9 +1468,9 @@ def reporte_clientes_pdf(request):
 
             # Mostrar datos de la compra
             pdf.drawString(70, y, producto.nombre)
-            pdf.drawString(200, y, str(cantidad))
-            pdf.drawString(300, y, f"S/. {precio_total:.2f}")
-            pdf.drawString(400, y, fecha_compra)
+            pdf.drawString(350, y, str(cantidad))
+            pdf.drawString(400, y, f"S/. {precio_total:.2f}")
+            pdf.drawString(500, y, fecha_compra)
             y -= 20
 
             # Añadir nueva página si es necesario
@@ -1535,10 +1533,16 @@ def reporte_proveedores(request):
         pdf.drawString(50, y, proveedor.nombre)
         y -= 20
         pdf.setFont("Helvetica", 12)
-        pdf.drawString(50, y, f"RUC: {proveedor.ruc}                NOMBRE: {proveedor.nombre}")
+        pdf.drawString(50, y, f"RUC: {proveedor.ruc}")   
         y -= 15
-        pdf.drawString(50, y, f"Contacto: {proveedor.telefono or '-'}    Email: {proveedor.correo or '-'}   Dirección: {proveedor.direccion or '-'}")
-        y -= 30
+        pdf.drawString(50, y, f"NOMBRE: {proveedor.nombre}")
+        y -= 15
+        pdf.drawString(50, y, f"Contacto: {proveedor.telefono or '-'}")
+        y -= 15
+        pdf.drawString(50, y, f"Email: {proveedor.correo or '-'}")
+        y -= 15
+        pdf.drawString(50, y, f"Dirección: {proveedor.direccion or '-'}")
+        y -=30
 
     pdf.save()
     pdf_data = buffer.getvalue()
