@@ -1240,7 +1240,13 @@ def reporte_ventas_pdf(request):
         alignment=1,  # Centrado
         spaceAfter=12
     )
-
+    #informacion de la empresa
+    elementos.append(Paragraph("DIRECCION : Jr moquegua 734   JUNIN-HUANCAYO-HUANCAYO"))
+    elementos.append(Paragraph("TELEFONO : 965650117"))
+    elementos.append(Paragraph("RUC : 20487151921"))
+    elementos.append(Paragraph("_"))
+    elementos.append(Paragraph("_"))
+    
     # Fecha actual
     fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
 
@@ -1248,7 +1254,7 @@ def reporte_ventas_pdf(request):
     logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
     
     # Fecha
-    elementos.append(Paragraph(f"Fecha de Reporte: {fecha_actual}", styles['Normal']))
+    elementos.append(Paragraph(f"FECHA DE REPORTE: {fecha_actual}", styles['Normal']))
     elementos.append(Spacer(1, 12))  # Espacio en blanco
     elementos.append(Spacer(1, 12))  # Espacio en blanco
 
@@ -1317,10 +1323,14 @@ def reporte_productos_pdf(request):
     pdf = canvas.Canvas(response, pagesize=letter)
     ancho, alto = letter
 
+    pdf.drawString(35, alto - 60, "DIRECCIONES : Jr moquegua 734   JUNIN-HUANCAYO-HUANCAYO")  # Ajustamos la coordenada Y
+    pdf.drawString(35, alto - 75, "TELEFONO : 965650117")  # Ajustamos la coordenada Y
+    pdf.drawString(35, alto - 90, "RUC : 20487151921")  # Ajustamos la coordenada Y
+
     # Fecha actual
     fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
     pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
+    pdf.drawString(35, alto - 45, f"FECHA DE REPORTE: {fecha_actual}")
 
     # Logo de la empresa
     logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
@@ -1333,7 +1343,6 @@ def reporte_productos_pdf(request):
     pdf.setFont("Helvetica-Bold", 16)
     pdf.drawString(200, alto - 120, "Reporte de Almacenes")  # Ajustamos la coordenada Y
 
-
     y = alto - 170  # Posición inicial
 
     # Obtener los datos de los almacenes
@@ -1345,9 +1354,12 @@ def reporte_productos_pdf(request):
         pdf.drawString(50, y, f"Almacén: {almacen.nombre}")
         y -= 20
 
-        # Obtener todos los productos relacionados
-        productos = Producto.objects.all()
+        # Obtener todos los productos relacionados con inventarios del almacén
+        inventarios = Inventario.objects.filter(almacen=almacen)
+        productos_ids = inventarios.values_list('producto_id', flat=True)
+        productos = Producto.objects.filter(serie__in=productos_ids)
 
+        # Si no hay productos, mostrar mensaje
         if not productos.exists():
             pdf.setFont("Helvetica-Oblique", 12)
             pdf.drawString(70, y, "No hay productos registrados.")
@@ -1364,12 +1376,7 @@ def reporte_productos_pdf(request):
         # Datos de los productos agrupados
         pdf.setFont("Helvetica", 12)
         for producto in productos:
-            # Obtener inventarios relacionados con el almacén y producto
-            inventarios = Inventario.objects.filter(almacen=almacen, producto=producto)
-
-            # Calcular cantidad total y precio total
-            cantidad_total = inventarios.aggregate(Sum('cantidad'))['cantidad__sum'] or 0
-            precio_total = cantidad_total * (producto.precio or 0.0)
+            cantidad_total = inventarios.filter(producto=producto).aggregate(Sum('cantidad'))['cantidad__sum'] or 0
             proveedor = producto.proveedor.nombre if producto.proveedor else "Ninguno"
 
             # Mostrar los datos del producto
@@ -1379,7 +1386,7 @@ def reporte_productos_pdf(request):
             y -= 20
 
             # Si la página se llena, añadir una nueva página
-            if y < 50:
+            if y < 90:
                 pdf.showPage()
                 pdf.setFont("Helvetica", 12)
                 pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
@@ -1387,11 +1394,9 @@ def reporte_productos_pdf(request):
                     pdf.drawImage(logo_path, ancho - 2.5 * inch, alto - 1.3 * inch, width=2 * inch, height=0.7 * inch, preserveAspectRatio=True)
                 except Exception as e:
                     print(f"Error al cargar el logo en la nueva página: {e}")
-                y -= 20  # Espacio de 20 puntos hacia abajo
-
+                y = alto - 120
                 pdf.setFont("Helvetica-Bold", 16)
                 pdf.drawString(200, alto - 120, "Reporte de Almacenes")
-                y = alto - 120
 
         # Espacio entre almacenes
         y -= 20
@@ -1414,8 +1419,13 @@ def reporte_clientes_pdf(request):
     # Fecha actual
     fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
     pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, alto - 50, f"Fecha de Reporte: {fecha_actual}")
+    pdf.drawString(35, alto - 50, f"FECHA DE REPORTE: {fecha_actual}")
 
+    #INFORMACION DE LA EMPRESA
+    pdf.drawString(35, alto - 65, "DIRECCIONES : Jr moquegua 734   JUNIN-HUANCAYO-HUANCAYO")
+    pdf.drawString(35, alto - 80, "TELEFONO : 965650117")
+    pdf.drawString(35, alto - 95, "RUC : 20487151921")
+    
     # Logo de la empresa
     logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
     try:
@@ -1474,7 +1484,7 @@ def reporte_clientes_pdf(request):
             y -= 20
 
             # Añadir nueva página si es necesario
-            if y < 50:
+            if y < 90:
                 pdf.showPage()
                 pdf.setFont("Helvetica-Bold", 14)
                 pdf.drawString(200, alto - 100, "Reporte de Clientes")
@@ -1506,7 +1516,12 @@ def reporte_proveedores(request):
     # Fecha actual
     fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
     pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, height - 50, f"Fecha de Reporte: {fecha_actual}")
+    pdf.drawString(35, height - 40, f"FECHA DE REPORTE: {fecha_actual}")
+
+    #INFORMACION DE LA EMPRESA
+    pdf.drawString(35, height - 55, "DIRECCIONES : Jr moquegua 734   JUNIN-HUANCAYO-HUANCAYO")
+    pdf.drawString(35, height - 70, "TELEFONO : 965650117")
+    pdf.drawString(35, height - 85, "RUC : 20487151921")
 
     # Logo de la empresa
     logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
@@ -1562,8 +1577,13 @@ def reporte_clientes(request):
     # Fecha actual
     fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
     pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, height - 50, f"Fecha de Reporte: {fecha_actual}")
+    pdf.drawString(35, height - 40, f"FECHA DE REPORTE: {fecha_actual}")
 
+    #INFORMACION DE LA EMPRESA
+    pdf.drawString(35, height - 55, "DIRECCIONES : Jr moquegua 734   JUNIN-HUANCAYO-HUANCAYO")
+    pdf.drawString(35, height - 70, "TELEFONO : 965650117")
+    pdf.drawString(35, height - 85, "RUC : 20487151921")
+    
     # Logo de la empresa
     logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
     try:
@@ -1612,8 +1632,13 @@ def reporte_usuarios(request):
     # Fecha actual
     fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
     pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, height - 50, f"Fecha de Reporte: {fecha_actual}")
+    pdf.drawString(35, height - 40, f"FECHA DE REPORTE : {fecha_actual}")
 
+    #INFORMACION DE LA EMPRESA
+    pdf.drawString(35, height - 55, "DIRECCIONES : Jr moquegua 734   JUNIN-HUANCAYO-HUANCAYO")
+    pdf.drawString(35, height - 70, "TELEFONO : 965650117")
+    pdf.drawString(35, height - 85, "RUC : 20487151921")
+    
     # Logo de la empresa
     logo_path = os.path.join('Programa/static/img', 'logo_logix.png')
     try:
